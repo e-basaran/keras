@@ -367,6 +367,11 @@ class SerializationLibTest(testing.TestCase):
         obj = serialization_lib.deserialize_keras_object(config)
         self.assertIs(obj, custom_registered_fn)
 
+    def test_deserialize_keras_object_print_coverage(self):
+        print("Branch Coverage Information:")
+        for branch_id, flag in serialization_lib.branch_flags.items():
+            print(f"Branch {branch_id} executed: {flag}")
+
     def test_typespec_deserialization(self):
         """Test deserialization of TensorSpec objects."""
         import tensorflow as tf
