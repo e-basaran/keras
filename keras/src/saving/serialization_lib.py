@@ -17,7 +17,7 @@ from keras.src.utils.module_utils import tensorflow as tf
 
 PLAIN_TYPES = (str, int, float, bool)
 
-branch_flags = {i: False for i in range(1, 26)}
+branch_flags = {i: False for i in range(1, 41)}
 
 # List of Keras modules with built-in string representations for Keras defaults
 BUILTIN_MODULES = (
