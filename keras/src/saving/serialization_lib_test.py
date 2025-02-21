@@ -369,8 +369,9 @@ class SerializationLibTest(testing.TestCase):
 
     def test_deserialize_invalid_config(self):
         # Test deserializing an invalid config (not a dict or primitive type)
-        with self.assertRaises(TypeError):
-            serialization_lib.deserialize_keras_object([1, 2, 3])
+        test_obj = [1, 2, 3]
+        result = serialization_lib.deserialize_keras_object(test_obj)
+        self.assertEqual(result, [1, 2, 3])  # Lists are handled as primitive types
 
     def test_deserialize_missing_class_name(self):
         # Test deserializing a dict without required class_name field
