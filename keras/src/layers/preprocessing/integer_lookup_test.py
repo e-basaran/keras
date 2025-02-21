@@ -122,8 +122,12 @@ class IntegerLookupTest(testing.TestCase):
 
     def test_set_vocabulary_zzprint_coverage(self):
         print("Branch Coverage Information:")
+        total_branches = len(index_lookup.branch_flags)
+        executed_branches = sum(1 for flag in index_lookup.branch_flags.values() if flag)
         for branch_id, flag in index_lookup.branch_flags.items():
             print(f"Branch {branch_id} executed: {flag}")
+        coverage_percentage = (executed_branches / total_branches) * 100 if total_branches > 0 else 0
+        print(f"Coverage percentage: {coverage_percentage:.2f}%")
 
 
     def test_tf_data_compatibility(self):
