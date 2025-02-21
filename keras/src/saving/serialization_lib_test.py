@@ -407,6 +407,51 @@ class SerializationLibTest(testing.TestCase):
         )
         self.assertEqual(result(5), 6)
 
+    def test_deserialize_keras_object_print_coverage(self):
+        print("Branch Coverage Information:")
+        for branch_id, flag in serialization_lib.branch_flags.items():
+            print(f"Branch {branch_id} executed: {flag}")
+
+    def test_typespec_deserialization(self):
+        """Test deserialization of TensorSpec objects."""
+        import tensorflow as tf
+        
+        
+        spec = tf.TensorSpec((None, 3), dtype=tf.float32)
+        
+
+        config = {
+            "class_name": "__typespec__",
+            "spec_name": "TensorSpec",
+            "module": "tensorflow.python.framework.tensor_spec",
+            "registered_name": None,
+            "config": [(None, 3), "float32", "cpu"]  # shape, dtype, device
+        }
+        
+        
+        deserialized = serialization_lib.deserialize_keras_object(config)
+        self.assertEqual(spec.shape, deserialized.shape)
+        self.assertEqual(spec.dtype, deserialized.dtype)
+
+    def test_shared_object_with_existing_instance(self):
+        """Test deserialization when a shared object already exists."""
+        with serialization_lib.ObjectSharingScope():
+      
+            shared_obj = keras.layers.Dense(1)
+            shared_id = 12345 
+            serialization_lib.record_object_after_deserialization(shared_obj, shared_id)
+            
+    
+            config = {
+                "class_name": "Dense",
+                "config": {"units": 1},
+                "shared_object_id": shared_id
+            }
+            
+            deserialized = serialization_lib.deserialize_keras_object(config)
+            self.assertIs(deserialized, shared_obj)
+
+
 
 @keras.saving.register_keras_serializable()
 class MyDense(keras.layers.Layer):

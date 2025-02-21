@@ -9,6 +9,8 @@ from keras.src.utils.python_utils import to_list
 
 NEG_INF = -1e10
 
+branch_flags = {i: False for i in range(1, 34)}
+
 
 def assert_thresholds_range(thresholds):
     if thresholds is not None:
@@ -334,7 +336,6 @@ def is_evenly_distributed_thresholds(thresholds):
     )
     return np.allclose(thresholds, even_thresholds, atol=backend.epsilon())
 
-
 def update_confusion_matrix_variables(
     variables_to_update,
     y_true,
@@ -401,17 +402,21 @@ def update_confusion_matrix_variables(
         `sample_weight` is not `None` and its shape doesn't match `y_pred`, or
         if `variables_to_update` contains invalid keys.
     """
-    if multi_label and label_weights is not None:
+    global branch_flags
+    if multi_label and label_weights is not None:  # Branch 1
+        branch_flags[1] = True
         raise ValueError(
             "`label_weights` for multilabel data should be handled "
             "outside of `update_confusion_matrix_variables` when "
             "`multi_label` is True."
         )
-    if variables_to_update is None:
+    if variables_to_update is None:  # Branch 2
+        branch_flags[2] = True
         return
-    if not any(
+    if not any(  # Branch 3
         key for key in variables_to_update if key in list(ConfusionMatrix)
     ):
+        branch_flags[3] = True
         raise ValueError(
             "Please provide at least one valid confusion matrix "
             "variable to update. Valid variable key options are: "
@@ -424,7 +429,8 @@ def update_confusion_matrix_variables(
     y_true = ops.cast(y_true, dtype=variable_dtype)
     y_pred = ops.cast(y_pred, dtype=variable_dtype)
 
-    if thresholds_distributed_evenly:
+    if thresholds_distributed_evenly:  # Branch 4
+        branch_flags[4] = True
         # Check whether the thresholds has any leading or tailing epsilon added
         # for floating point imprecision. The leading and tailing threshold will
         # be handled bit differently as the corner case.  At this point,
@@ -436,25 +442,29 @@ def update_confusion_matrix_variables(
     thresholds = ops.convert_to_tensor(thresholds, dtype=variable_dtype)
     num_thresholds = ops.shape(thresholds)[0]
 
-    if multi_label:
+    if multi_label:  # Branch 5
+        branch_flags[5] = True
         one_thresh = ops.equal(
             np.array(1, dtype="int32"),
             len(thresholds.shape),
         )
-    else:
+    else:  # Branch 6
+        branch_flags[6] = True
         one_thresh = np.array(True, dtype="bool")
 
     invalid_keys = [
         key for key in variables_to_update if key not in list(ConfusionMatrix)
     ]
-    if invalid_keys:
+    if invalid_keys:  # Branch 7
+        branch_flags[7] = True
         raise ValueError(
             f'Invalid keys: "{invalid_keys}". '
             f'Valid variable key options are: "{list(ConfusionMatrix)}"'
         )
 
     y_pred, y_true = squeeze_or_expand_to_same_rank(y_pred, y_true)
-    if sample_weight is not None:
+    if sample_weight is not None:  # Branch 8
+        branch_flags[8] = True
         sample_weight = ops.expand_dims(
             ops.cast(sample_weight, dtype=variable_dtype), axis=-1
         )
@@ -462,11 +472,14 @@ def update_confusion_matrix_variables(
             y_true, sample_weight, expand_rank_1=False
         )
 
-    if top_k is not None:
+    if top_k is not None:  # Branch 9
+        branch_flags[9] = True
         y_pred = _filter_top_k(y_pred, top_k)
 
-    if class_id is not None:
-        if len(y_pred.shape) == 1:
+    if class_id is not None:  # Branch 10
+        branch_flags[10] = True
+        if len(y_pred.shape) == 1:  # Branch 11
+            branch_flags[11] = True
             raise ValueError(
                 "When class_id is provided, y_pred must be a 2D array "
                 "with shape (num_samples, num_classes), found shape: "
@@ -477,7 +490,8 @@ def update_confusion_matrix_variables(
         y_true = y_true[..., class_id, None]
         y_pred = y_pred[..., class_id, None]
 
-    if thresholds_distributed_evenly:
+    if thresholds_distributed_evenly:  # Branch 12
+        branch_flags[12] = True
         return _update_confusion_matrix_variables_optimized(
             variables_to_update,
             y_true,
@@ -489,40 +503,50 @@ def update_confusion_matrix_variables(
             thresholds_with_epsilon=thresholds_with_epsilon,
         )
 
-    if None in y_pred.shape:
+    if None in y_pred.shape:  # Branch 13
+        branch_flags[13] = True
         pred_shape = ops.shape(y_pred)
         num_predictions = pred_shape[0]
-        if len(y_pred.shape) == 1:
+        if len(y_pred.shape) == 1:  # Branch 14
+            branch_flags[14] = True
             num_labels = 1
-        else:
+        else:  # Branch 15
+            branch_flags[15] = True
             num_labels = ops.cast(
                 ops.prod(ops.array(pred_shape[1:]), axis=0), "int32"
             )
         thresh_label_tile = ops.where(one_thresh, num_labels, 1)
-    else:
+    else:  # Branch 16
+        branch_flags[16] = True
         pred_shape = ops.shape(y_pred)
         num_predictions = pred_shape[0]
-        if len(y_pred.shape) == 1:
+        if len(y_pred.shape) == 1:  # Branch 17
+            branch_flags[17] = True
             num_labels = 1
-        else:
+        else: # Branch 18
+            branch_flags[18] = True
             num_labels = np.prod(pred_shape[1:], axis=0).astype("int32")
         thresh_label_tile = np.where(one_thresh, num_labels, 1)
 
     # Reshape predictions and labels, adding a dim for thresholding.
-    if multi_label:
+    if multi_label: # Branch 19
+        branch_flags[19] = True
         predictions_extra_dim = ops.expand_dims(y_pred, 0)
         labels_extra_dim = ops.expand_dims(ops.cast(y_true, dtype="bool"), 0)
-    else:
+    else: # Branch 20
+        branch_flags[20] = True
         # Flatten predictions and labels when not multilabel.
         predictions_extra_dim = ops.reshape(y_pred, [1, -1])
         labels_extra_dim = ops.reshape(ops.cast(y_true, dtype="bool"), [1, -1])
 
     # Tile the thresholds for every prediction.
-    if multi_label:
+    if multi_label: # Branch 21
+        branch_flags[21] = True
         thresh_pretile_shape = [num_thresholds, 1, -1]
         thresh_tiles = [1, num_predictions, thresh_label_tile]
         data_tiles = [num_thresholds, 1, 1]
-    else:
+    else: # Branch 22
+        branch_flags[22] = True
         thresh_pretile_shape = [num_thresholds, -1]
         thresh_tiles = [1, num_predictions * num_labels]
         data_tiles = [num_thresholds, 1]
@@ -540,30 +564,36 @@ def update_confusion_matrix_variables(
     # Tile labels by number of thresholds
     label_is_pos = ops.tile(labels_extra_dim, data_tiles)
 
-    if sample_weight is not None:
+    if sample_weight is not None: # Branch 23
+        branch_flags[23] = True
         sample_weight = ops.broadcast_to(
             ops.cast(sample_weight, dtype=y_pred.dtype), ops.shape(y_pred)
         )
         weights_tiled = ops.tile(
             ops.reshape(sample_weight, thresh_tiles), data_tiles
         )
-    else:
+    else: # Branch 24
+        branch_flags[24] = True
         weights_tiled = None
 
-    if label_weights is not None and not multi_label:
+    if label_weights is not None and not multi_label: # Branch 25
+        branch_flags[25] = True
         label_weights = ops.expand_dims(label_weights, 0)
         label_weights = ops.broadcast_to(label_weights, ops.shape(y_pred))
         label_weights_tiled = ops.tile(
             ops.reshape(label_weights, thresh_tiles), data_tiles
         )
-        if weights_tiled is None:
+        if weights_tiled is None: # Branch 26
+            branch_flags[26] = True
             weights_tiled = label_weights_tiled
-        else:
+        else:# Branch 27
+            branch_flags[27] = True
             weights_tiled = ops.multiply(weights_tiled, label_weights_tiled)
 
     def weighted_assign_add(label, pred, weights, var):
         label_and_pred = ops.cast(ops.logical_and(label, pred), dtype=var.dtype)
-        if weights is not None:
+        if weights is not None: # Branch 28
+            branch_flags[28] = True
             label_and_pred *= ops.cast(weights, dtype=var.dtype)
         var.assign(var + ops.sum(label_and_pred, 1))
 
@@ -574,21 +604,26 @@ def update_confusion_matrix_variables(
     update_fp = ConfusionMatrix.FALSE_POSITIVES in variables_to_update
     update_fn = ConfusionMatrix.FALSE_NEGATIVES in variables_to_update
 
-    if update_fn or update_tn:
+    if update_fn or update_tn: # Branch 29
+        branch_flags[29] = True
         pred_is_neg = ops.logical_not(pred_is_pos)
         loop_vars[ConfusionMatrix.FALSE_NEGATIVES] = (label_is_pos, pred_is_neg)
 
-    if update_fp or update_tn:
+    if update_fp or update_tn: # Branch 30
+        branch_flags[30] = True
         label_is_neg = ops.logical_not(label_is_pos)
         loop_vars[ConfusionMatrix.FALSE_POSITIVES] = (label_is_neg, pred_is_pos)
-        if update_tn:
+        if update_tn:# Branch 31
+            branch_flags[31] = True
             loop_vars[ConfusionMatrix.TRUE_NEGATIVES] = (
                 label_is_neg,
                 pred_is_neg,
             )
 
-    for matrix_cond, (label, pred) in loop_vars.items():
-        if matrix_cond in variables_to_update:
+    for matrix_cond, (label, pred) in loop_vars.items(): # Branch 32
+        branch_flags[32] = True
+        if matrix_cond in variables_to_update: # Branch 33
+            branch_flags[33] = True
             weighted_assign_add(
                 label, pred, weights_tiled, variables_to_update[matrix_cond]
             )

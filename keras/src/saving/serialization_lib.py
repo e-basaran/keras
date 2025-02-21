@@ -17,6 +17,8 @@ from keras.src.utils.module_utils import tensorflow as tf
 
 PLAIN_TYPES = (str, int, float, bool)
 
+branch_flags = {i: False for i in range(1, 41)}
+
 # List of Keras modules with built-in string representations for Keras defaults
 BUILTIN_MODULES = (
     "activations",
@@ -494,6 +496,7 @@ def deserialize_keras_object(
     Returns:
         The object described by the `config` dictionary.
     """
+    global branch_flags
     safe_scope_arg = in_safe_mode()  # Enforces SafeModeScope
     safe_mode = safe_scope_arg if safe_scope_arg is not None else safe_mode
 
@@ -504,6 +507,7 @@ def deserialize_keras_object(
     custom_objects = {**custom_objects, **tlco, **gco}
 
     if config is None:
+        branch_flags[1] = True
         return None
 
     if (
@@ -511,11 +515,13 @@ def deserialize_keras_object(
         and custom_objects
         and custom_objects.get(config) is not None
     ):
+        branch_flags[2] = True
         # This is to deserialize plain functions which are serialized as
         # string names by legacy saving formats.
         return custom_objects[config]
 
     if isinstance(config, (list, tuple)):
+        branch_flags[3] = True
         return [
             deserialize_keras_object(
                 x, custom_objects=custom_objects, safe_mode=safe_mode
@@ -524,12 +530,16 @@ def deserialize_keras_object(
         ]
 
     if module_objects is not None:
+        branch_flags[4] = True
         inner_config, fn_module_name, has_custom_object = None, None, False
 
         if isinstance(config, dict):
+            branch_flags[5] = True
             if "config" in config:
+                branch_flags[6] = True
                 inner_config = config["config"]
             if "class_name" not in config:
+                branch_flags[7] = True
                 raise ValueError(
                     f"Unknown `config` as a `dict`, config={config}"
                 )
@@ -543,19 +553,25 @@ def deserialize_keras_object(
                     and inner_config in custom_objects
                 )
             ):
+                branch_flags[8] = True
                 has_custom_object = True
 
             # Case where config is function but not in custom objects
             elif config["class_name"] == "function":
+                branch_flags[9] = True
                 fn_module_name = config["module"]
                 if fn_module_name == "builtins":
+                    branch_flags[10] = True
                     config = config["config"]
                 else:
+                    branch_flags[11] = True
                     config = config["registered_name"]
 
             # Case where config is class but not in custom objects
             else:
+                branch_flags[12] = True
                 if config.get("module", "_") is None:
+                    branch_flags[13] = True
                     raise TypeError(
                         "Cannot deserialize object of type "
                         f"`{config['class_name']}`. If "
@@ -567,11 +583,14 @@ def deserialize_keras_object(
                 config = config["class_name"]
 
         if not has_custom_object:
+            branch_flags[14] = True
             # Return if not found in either module objects or custom objects
             if config not in module_objects:
+                branch_flags[15] = True
                 # Object has already been deserialized
                 return config
             if isinstance(module_objects[config], types.FunctionType):
+                branch_flags[16] = True
                 return deserialize_keras_object(
                     serialize_with_public_fn(
                         module_objects[config], config, fn_module_name
@@ -586,11 +605,14 @@ def deserialize_keras_object(
             )
 
     if isinstance(config, PLAIN_TYPES):
+        branch_flags[17] = True
         return config
     if not isinstance(config, dict):
+        branch_flags[18] = True
         raise TypeError(f"Could not parse config: {config}")
 
     if "class_name" not in config or "config" not in config:
+        branch_flags[19] = True
         return {
             key: deserialize_keras_object(
                 value, custom_objects=custom_objects, safe_mode=safe_mode
@@ -604,6 +626,7 @@ def deserialize_keras_object(
 
     # Special cases:
     if class_name == "__keras_tensor__":
+        branch_flags[20] = True
         obj = backend.KerasTensor(
             inner_config["shape"], dtype=inner_config["dtype"]
         )
@@ -611,16 +634,21 @@ def deserialize_keras_object(
         return obj
 
     if class_name == "__tensor__":
+        branch_flags[21] = True
         return backend.convert_to_tensor(
             inner_config["value"], dtype=inner_config["dtype"]
         )
     if class_name == "__numpy__":
+        branch_flags[22] = True
         return np.array(inner_config["value"], dtype=inner_config["dtype"])
     if config["class_name"] == "__bytes__":
+        branch_flags[23] = True
         return inner_config["value"].encode("utf-8")
     if config["class_name"] == "__ellipsis__":
+        branch_flags[24] = True
         return Ellipsis
     if config["class_name"] == "__slice__":
+        branch_flags[25] = True
         return slice(
             deserialize_keras_object(
                 inner_config["start"],
@@ -639,7 +667,9 @@ def deserialize_keras_object(
             ),
         )
     if config["class_name"] == "__lambda__":
+        branch_flags[26] = True
         if safe_mode:
+            branch_flags[27] = True
             raise ValueError(
                 "Requested the deserialization of a `lambda` object. "
                 "This carries a potential risk of arbitrary code execution "
@@ -650,6 +680,7 @@ def deserialize_keras_object(
             )
         return python_utils.func_load(inner_config["value"])
     if tf is not None and config["class_name"] == "__typespec__":
+        branch_flags[28] = True
         obj = _retrieve_class_or_fn(
             config["spec_name"],
             config["registered_name"],
@@ -661,9 +692,13 @@ def deserialize_keras_object(
         # Conversion to TensorShape and DType
         inner_config = map(
             lambda x: (
-                tf.TensorShape(x)
+                (branch_flags.update({29: True}) or tf.TensorShape(x)) # The update() method is used with the or operator because we need to both set the flag and return the actual value.
                 if isinstance(x, list)
-                else (getattr(tf, x) if hasattr(tf.dtypes, str(x)) else x)
+                else (
+                    (branch_flags.update({30: True}) or getattr(tf, x))
+                    if hasattr(tf.dtypes, str(x))
+                    else (branch_flags.update({31: True}) or x)
+                )
             ),
             inner_config,
         )
@@ -674,6 +709,7 @@ def deserialize_keras_object(
     registered_name = config.get("registered_name", class_name)
 
     if class_name == "function":
+        branch_flags[32] = True
         fn_name = inner_config
         return _retrieve_class_or_fn(
             fn_name,
@@ -687,6 +723,7 @@ def deserialize_keras_object(
     # Below, handling of all classes.
     # First, is it a shared object?
     if "shared_object_id" in config:
+        branch_flags[33] = True
         obj = get_shared_object(config["shared_object_id"])
         if obj is not None:
             return obj
@@ -701,8 +738,10 @@ def deserialize_keras_object(
     )
 
     if isinstance(cls, types.FunctionType):
+        branch_flags[34] = True
         return cls
     if not hasattr(cls, "from_config"):
+        branch_flags[35] = True
         raise TypeError(
             f"Unable to reconstruct an instance of '{class_name}' because "
             f"the class is missing a `from_config()` method. "
@@ -711,12 +750,14 @@ def deserialize_keras_object(
 
     # Instantiate the class from its config inside a custom object scope
     # so that we can catch any custom objects that the config refers to.
+    branch_flags[36] = True
     custom_obj_scope = object_registration.CustomObjectScope(custom_objects)
     safe_mode_scope = SafeModeScope(safe_mode)
     with custom_obj_scope, safe_mode_scope:
         try:
             instance = cls.from_config(inner_config)
         except TypeError as e:
+            branch_flags[37] = True
             raise TypeError(
                 f"{cls} could not be deserialized properly. Please"
                 " ensure that components that are Python object"
@@ -727,14 +768,17 @@ def deserialize_keras_object(
             )
         build_config = config.get("build_config", None)
         if build_config and not instance.built:
+            branch_flags[38] = True
             instance.build_from_config(build_config)
             instance.built = True
         compile_config = config.get("compile_config", None)
         if compile_config:
+            branch_flags[39] = True
             instance.compile_from_config(compile_config)
             instance.compiled = True
 
     if "shared_object_id" in config:
+        branch_flags[40] = True
         record_object_after_deserialization(
             instance, config["shared_object_id"]
         )
