@@ -9,6 +9,8 @@ from keras.src.utils import numerical_utils
 from keras.src.utils import tf_utils
 from keras.src.utils.module_utils import tensorflow as tf
 
+branch_flags = {i: False for i in range(1, 26)}
+
 
 class IndexLookup(Layer):
     """Maps values from a vocabulary to integer indices.
@@ -369,12 +371,16 @@ class IndexLookup(Layer):
                 length to vocabulary. Must be set if `output_mode`
                 is `"tf_idf"`. Should not be set otherwise.
         """
+        global branch_flags
         if self.output_mode == "tf_idf":
+            branch_flags[1] = True
             if idf_weights is None:
+                branch_flags[2] = True
                 raise ValueError(
                     "`idf_weights` must be set if output_mode is 'tf_idf'."
                 )
         elif idf_weights is not None:
+            branch_flags[3] = True
             raise ValueError(
                 "`idf_weights` should only be set if output_mode is "
                 f"`'tf_idf'`. Received: output_mode={self.output_mode} "
@@ -382,11 +388,14 @@ class IndexLookup(Layer):
             )
 
         if isinstance(vocabulary, str):
+            branch_flags[4] = True
             if not tf.io.gfile.exists(vocabulary):
+                branch_flags[5] = True
                 raise ValueError(
                     f"Vocabulary file {vocabulary} does not exist."
                 )
             if self.output_mode == "tf_idf":
+                branch_flags[6] = True
                 raise ValueError(
                     "output_mode `'tf_idf'` does not support loading a "
                     "vocabulary from file."
@@ -398,6 +407,7 @@ class IndexLookup(Layer):
         if not tf.executing_eagerly() and (
             tf.is_tensor(vocabulary) or tf.is_tensor(idf_weights)
         ):
+            branch_flags[7] = True
             raise RuntimeError(
                 f"Cannot set a tensor vocabulary on layer {self.name} "
                 "when not executing eagerly. "
@@ -405,19 +415,25 @@ class IndexLookup(Layer):
                 "outside of any traced function."
             )
 
+
         # TODO(mattdangerw): for better performance we should rewrite this
         # entire function to operate on tensors and convert vocabulary to a
         # tensor here.
         if tf.is_tensor(vocabulary):
+            branch_flags[8] = True
             vocabulary = self._tensor_vocab_to_numpy(vocabulary)
         elif isinstance(vocabulary, (list, tuple)):
+            branch_flags[9] = True
             vocabulary = np.array(vocabulary)
         if tf.is_tensor(idf_weights):
+            branch_flags[10] = True
             idf_weights = idf_weights.numpy()
         elif isinstance(idf_weights, (list, tuple)):
+            branch_flags[11] = True
             idf_weights = np.array(idf_weights)
 
         if vocabulary.size == 0:
+            branch_flags[12] = True
             raise ValueError(
                 "Cannot set an empty vocabulary. "
                 f"Received: vocabulary={vocabulary}"
@@ -432,12 +448,15 @@ class IndexLookup(Layer):
             special_tokens, vocabulary[:token_start]
         )
         if found_special_tokens:
+            branch_flags[13] = True
             tokens = vocabulary[token_start:]
         else:
+            branch_flags[14] = True
             tokens = vocabulary
 
         repeated_tokens = self._find_repeated_tokens(tokens)
         if repeated_tokens:
+            branch_flags[15] = True
             raise ValueError(
                 "The passed vocabulary has at least one repeated "
                 "term. Please uniquify your dataset. The repeated terms "
@@ -445,6 +464,7 @@ class IndexLookup(Layer):
             )
 
         if self.mask_token is not None and self.mask_token in tokens:
+            branch_flags[16] = True
             mask_index = np.argwhere(vocabulary == self.mask_token)[-1]
             raise ValueError(
                 "Found reserved mask token at unexpected location in "
@@ -462,6 +482,7 @@ class IndexLookup(Layer):
             and self.invert
             and self.oov_token in tokens
         ):
+            branch_flags[17] = True
             oov_index = np.argwhere(vocabulary == self.oov_token)[-1]
             raise ValueError(
                 "Found reserved OOV token at unexpected location in "
@@ -475,6 +496,7 @@ class IndexLookup(Layer):
 
         new_vocab_size = token_start + len(tokens)
         if self.max_tokens is not None and (new_vocab_size > self.max_tokens):
+            branch_flags[18] = True
             raise ValueError(
                 "Attempted to set a vocabulary larger than the maximum vocab "
                 f"size. Received vocabulary size is {new_vocab_size}; "
@@ -484,7 +506,9 @@ class IndexLookup(Layer):
         self._record_vocabulary_size()
 
         if self.output_mode == "tf_idf" and idf_weights is not None:
+            branch_flags[19] = True
             if len(vocabulary) != len(idf_weights):
+                branch_flags[20] = True
                 raise ValueError(
                     "`idf_weights` must be the same length as vocabulary. "
                     f"len(idf_weights) is {len(idf_weights)}; "
@@ -492,6 +516,7 @@ class IndexLookup(Layer):
                 )
             idf_weights = self._convert_to_ndarray(idf_weights)
             if idf_weights.ndim != 1:
+                branch_flags[21] = True
                 raise ValueError(
                     "TF-IDF data must be a 1-index array. "
                     f"Received: type(idf_weights)={type(idf_weights)}"
@@ -502,9 +527,11 @@ class IndexLookup(Layer):
             # these tokens so we will use an average of all idf_weights passed
             # in as a reasonable default.
             if found_special_tokens:
+                branch_flags[22] = True
                 front_padding = 0
                 front_padding_value = 0
             else:
+                branch_flags[23] = True
                 front_padding = token_start
                 front_padding_value = np.average(idf_weights)
             # If pad_to_max_tokens is true, and max_tokens is greater than our
@@ -512,10 +539,12 @@ class IndexLookup(Layer):
             # zeros as well.
             back_padding_value = 0
             if self.pad_to_max_tokens and self.max_tokens is not None:
+                branch_flags[24] = True
                 back_padding = (
                     self.max_tokens - front_padding - len(idf_weights)
                 )
             else:
+                branch_flags[25] = True
                 back_padding = 0
             weights = np.pad(
                 idf_weights,
@@ -529,7 +558,7 @@ class IndexLookup(Layer):
                 trainable=False,
             )
             self.idf_weights_const = self.idf_weights.value()
-
+            
     def build(self):
         self.built = True
 
