@@ -4,7 +4,7 @@ from tensorflow import data as tf_data
 from keras.src import backend
 from keras.src import layers
 from keras.src import testing
-
+from keras.src.layers.preprocessing import index_lookup
 
 class IntegerLookupTest(testing.TestCase):
     # TODO: increase coverage. Most features aren't being tested.
@@ -94,6 +94,12 @@ class IntegerLookupTest(testing.TestCase):
         output = layer(input_data)
         self.assertTrue(backend.is_tensor(output))
         self.assertAllClose(output, np.array([2, 3, 4, 0]))
+
+    def test_set_vocabulary_zzprint_coverage(self):
+        print("Branch Coverage Information:")
+        for branch_id, flag in index_lookup.branch_flags.items():
+            print(f"Branch {branch_id} executed: {flag}")
+
 
     def test_tf_data_compatibility(self):
         layer = layers.IntegerLookup(
