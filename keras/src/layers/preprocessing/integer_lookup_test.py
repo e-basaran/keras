@@ -105,6 +105,11 @@ class IntegerLookupTest(testing.TestCase):
         with self.assertRaises(ValueError):
             layer.set_vocabulary([1, 2, 3, 4], idf_weights=[0.1, 0.2, 0.3])
 
+    def test_set_vocabulary_empty(self):
+        layer = layers.IntegerLookup(output_mode="int")
+        with self.assertRaises(ValueError):
+            layer.set_vocabulary([])
+
     def test_set_vocabulary_zzprint_coverage(self):
         print("Branch Coverage Information:")
         for branch_id, flag in index_lookup.branch_flags.items():
