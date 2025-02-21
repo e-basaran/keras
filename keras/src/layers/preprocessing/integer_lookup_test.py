@@ -95,6 +95,11 @@ class IntegerLookupTest(testing.TestCase):
         self.assertTrue(backend.is_tensor(output))
         self.assertAllClose(output, np.array([2, 3, 4, 0]))
 
+    def test_set_vocabulary_tf_idf_error(self):
+        layer = layers.IntegerLookup(output_mode="tf_idf")
+        with self.assertRaises(ValueError):
+            layer.set_vocabulary([1, 2, 3, 4])
+
     def test_set_vocabulary_zzprint_coverage(self):
         print("Branch Coverage Information:")
         for branch_id, flag in index_lookup.branch_flags.items():
