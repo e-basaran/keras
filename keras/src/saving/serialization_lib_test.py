@@ -416,18 +416,33 @@ class SerializationLibTest(testing.TestCase):
         """Test deserialization of TensorSpec objects."""
         import tensorflow as tf
         
+        # Register TensorSpec for serialization
+        @keras.saving.register_keras_serializable(package="tensorflow")
+        class TensorSpec(tf.TensorSpec):
+            def get_config(self):
+                return {
+                    "shape": self.shape,
+                    "dtype": self.dtype.name,
+                    "name": self.name
+                }
+            
+            @classmethod
+            def from_config(cls, config):
+                return cls(
+                    shape=config["shape"],
+                    dtype=config["dtype"],
+                    name=config["name"]
+                )
         
-        spec = tf.TensorSpec((None, 3), dtype=tf.float32)
+        spec = TensorSpec((None, 3), dtype=tf.float32)
         
-
         config = {
             "class_name": "__typespec__",
             "spec_name": "TensorSpec",
-            "module": "tensorflow.python.framework.tensor_spec",
-            "registered_name": None,
+            "module": "tensorflow",
+            "registered_name": "tensorflow>TensorSpec",
             "config": [(None, 3), "float32", "cpu"]  # shape, dtype, device
         }
-        
         
         deserialized = serialization_lib.deserialize_keras_object(config)
         self.assertEqual(spec.shape, deserialized.shape)
