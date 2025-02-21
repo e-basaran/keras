@@ -38,7 +38,7 @@ class FalsePositivesTest(testing.TestCase):
 
         fp_obj.update_state(y_true, y_pred)
         self.assertAllClose(7.0, fp_obj.result())
-
+        
     def test_weighted(self):
         fp_obj = metrics.FalsePositives()
         y_true = np.array(
@@ -105,6 +105,44 @@ class FalsePositivesTest(testing.TestCase):
             r"Threshold values must be in \[0, 1\]. Received: \[None\]",
         ):
             metrics.FalsePositives(thresholds=[None])
+
+    def test_update_confusion_matrix_variables(self):
+        fp_obj = metrics.FalsePositives()
+
+        # Example inputs that should work with `update_confusion_matrix_variables`
+        y_true = np.array(
+            ((0, 1, 0, 1, 0), (0, 0, 1, 1, 1), (1, 1, 1, 1, 0), (0, 0, 0, 0, 1))
+        )
+        y_pred = np.array(
+            ((0, 0, 1, 1, 0), (1, 1, 1, 1, 1), (0, 1, 0, 1, 0), (1, 1, 1, 1, 1))
+        )
+        # Call `update_state`, which uses `update_confusion_matrix_variables` internally
+        fp_obj.update_state(y_true, y_pred)
+
+        # Expected result computed based on false positives in the provided arrays
+        expected_result = 7.0
+
+        # Assertion to ensure the utility function worked as expected
+        self.assertAllClose(expected_result, fp_obj.result())
+
+    def test_edge_cases_update_confusion_matrix_variables_empty_array(self):
+        # Empty Input Arrays
+        fp_obj = metrics.FalsePositives()
+        y_true = np.array([])
+        y_pred = np.array([])
+        # Call `update_state`, which uses `update_confusion_matrix_variables` internally
+        fp_obj.update_state(y_true, y_pred)
+        self.assertAllClose(0.0, fp_obj.result(), msg="Empty arrays should result in 0 false positives.")
+    def test_edge_cases_update_confusion_matrix_variables_all_zero(self):
+         # All Zeros (No Positive Cases)
+        fp_obj = metrics.FalsePositives()
+       
+        y_true = np.array([0, 0, 0, 0])
+        y_pred = np.array([0, 0, 0, 0])
+        # Call `update_state`, which uses `update_confusion_matrix_variables` internally
+        fp_obj.update_state(y_true, y_pred)
+        self.assertAllClose(0.0, fp_obj.result(), msg="All zeros should result in 0 false positives.")
+
 
 
 class FalseNegativesTest(testing.TestCase):
@@ -195,6 +233,7 @@ class FalseNegativesTest(testing.TestCase):
         ):
             metrics.FalseNegatives(thresholds=[None])
 
+    
 
 class TrueNegativesTest(testing.TestCase):
     def test_config(self):
@@ -283,7 +322,7 @@ class TrueNegativesTest(testing.TestCase):
             r"Threshold values must be in \[0, 1\]. Received: \[None\]",
         ):
             metrics.TrueNegatives(thresholds=[None])
-
+    
 
 class TruePositiveTest(testing.TestCase):
     def test_config(self):
@@ -538,7 +577,17 @@ class PrecisionTest(testing.TestCase):
         self.assertAlmostEqual(1, result)
         self.assertAlmostEqual(1, p_obj.true_positives)
         self.assertAlmostEqual(0, p_obj.false_positives)
+    # New Test for Precision using `update_confusion_matrix_variables`
+    def test_update_confusion_matrix_variables_precision(self):
+        p_obj = metrics.Precision()
 
+        y_true = np.array([0, 1, 1, 0])
+        y_pred = np.array([1, 0, 1, 0])
+        # Call `update_state`, which uses `update_confusion_matrix_variables` internally
+        p_obj.update_state(y_true, y_pred)
+
+        expected_result = 0.5  # TP / (TP + FP) = 1 / (1 + 1)
+        self.assertAlmostEqual(expected_result, p_obj.result())
 
 class RecallTest(testing.TestCase):
     def test_config(self):
@@ -699,7 +748,6 @@ class RecallTest(testing.TestCase):
         self.assertAlmostEqual(1, r_obj.true_positives)
         self.assertAlmostEqual(3, r_obj.false_negatives)
 
-
 class SensitivityAtSpecificityTest(testing.TestCase):
     def test_config(self):
         s_obj = metrics.SensitivityAtSpecificity(
@@ -786,7 +834,6 @@ class SensitivityAtSpecificityTest(testing.TestCase):
             ValueError, "Argument `num_thresholds` must be an integer > 0"
         ):
             metrics.SensitivityAtSpecificity(0.4, num_thresholds=-1)
-
 
 class SpecificityAtSensitivityTest(testing.TestCase):
     def test_config(self):
@@ -875,7 +922,6 @@ class SpecificityAtSensitivityTest(testing.TestCase):
             ValueError, "Argument `num_thresholds` must be an integer > 0"
         ):
             metrics.SpecificityAtSensitivity(0.4, num_thresholds=-1)
-
 
 class PrecisionAtRecallTest(testing.TestCase):
     def test_config(self):
