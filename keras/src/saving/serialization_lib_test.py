@@ -411,6 +411,10 @@ class SerializationLibTest(testing.TestCase):
         print("Branch Coverage Information:")
         for branch_id, flag in serialization_lib.branch_flags.items():
             print(f"Branch {branch_id} executed: {flag}")
+            
+        true_count = sum(1 for value in index_lookup.branch_flags.values() if value is True)
+        percentage = (true_count / len(index_lookup.branch_flags)) * 100
+        print(f"Branch Coverage: {percentage}%")
 
     def test_typespec_deserialization(self):
         """Test deserialization of TensorSpec objects."""

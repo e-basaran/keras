@@ -291,6 +291,15 @@ class TrueNegativesTest(testing.TestCase):
         tn_obj.update_state(y_true, y_pred)
         self.assertAllClose([2.0, 5.0, 7.0], tn_obj.result())
 
+    def update_confusion_matrix_print_coverage(self):
+        print("Branch Coverage Information:")
+        for branch_id, flag in metrics_utils.branch_flags.items():
+            print(f"Branch {branch_id} executed: {flag}")
+            
+        true_count = sum(1 for value in metrics_utils.branch_flags.values() if value is True)
+        percentage = (true_count / len(metrics_utils.branch_flags)) * 100
+        print(f"Branch Coverage: {percentage}%")
+
     def test_weighted_with_thresholds(self):
         tn_obj = metrics.TrueNegatives(thresholds=[0.15, 0.5, 0.85])
 
