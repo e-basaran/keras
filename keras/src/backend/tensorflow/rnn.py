@@ -2,7 +2,13 @@ import tensorflow as tf
 
 from keras.src import tree
 
+coverage_flags = {}
 
+
+def record_branch(branch_id):
+    """Increment the coverage count for a specific branch."""
+    coverage_flags[branch_id] = coverage_flags.get(branch_id, 0) + 1
+    print(f"Branch {branch_id}: hit {coverage_flags[branch_id]} time(s)")
 def rnn(
     step_function,
     inputs,
@@ -85,6 +91,7 @@ def rnn(
         return tf.transpose(input_t, axes)
 
     if not time_major:
+        record_branch("test_1")
         inputs = tree.map_structure(swap_batch_timestep, inputs)
 
     flattened_inputs = tree.flatten(inputs)
@@ -97,14 +104,19 @@ def rnn(
         input_.shape.with_rank_at_least(3)
 
     if mask is not None:
+        record_branch("test_2")
         if mask.dtype != tf.bool:
+            record_branch("test_3")
             mask = tf.cast(mask, tf.bool)
         if len(mask.shape) == 2:
+            record_branch("test_4")
             mask = tf.expand_dims(mask, axis=-1)
         if not time_major:
+            record_branch("test_5")
             mask = swap_batch_timestep(mask)
 
     if constants is None:
+        record_branch("test_6")
         constants = []
 
     # tf.where needs its condition tensor to be the same shape as its two
@@ -115,10 +127,12 @@ def rnn(
     # second dimension n times.
     def _expand_mask(mask_t, input_t, fixed_dim=1):
         if tree.is_nested(mask_t):
+            record_branch("test_7")
             raise ValueError(
                 f"mask_t is expected to be tensor, but got {mask_t}"
             )
         if tree.is_nested(input_t):
+            record_branch("test_8")
             raise ValueError(
                 f"input_t is expected to be tensor, but got {input_t}"
             )
@@ -129,7 +143,9 @@ def rnn(
         return tf.tile(mask_t, multiples)
 
     if unroll:
+        record_branch("test_9")
         if not time_steps:
+            record_branch("test_10")
             raise ValueError("Unrolling requires a fixed number of timesteps.")
         states = tuple(initial_states)
         successive_states = []
@@ -143,23 +159,29 @@ def rnn(
         def _process_single_input_t(input_t):
             input_t = tf.unstack(input_t)  # unstack for time_step dim
             if go_backwards:
+                record_branch("test_11")
                 input_t.reverse()
             return input_t
 
         if tree.is_nested(inputs):
+            record_branch("test_12")
             processed_input = tree.map_structure(
                 _process_single_input_t, inputs
             )
         else:
+            record_branch("test_13")
             processed_input = (_process_single_input_t(inputs),)
 
         def _get_input_tensor(time):
+            record_branch("test_14")
             inp = [t_[time] for t_ in processed_input]
             return tree.pack_sequence_as(inputs, inp)
 
         if mask is not None:
+            record_branch("test_15")
             mask_list = tf.unstack(mask)
             if go_backwards:
+                record_branch("test_16")
                 mask_list.reverse()
 
             for i in range(time_steps):
@@ -171,8 +193,10 @@ def rnn(
                 tiled_mask_t = _expand_mask(mask_t, output)
 
                 if not successive_outputs:
+                    record_branch("test_17")
                     prev_output = tf.zeros_like(output)
                 else:
+                    record_branch("test_18")
                     prev_output = successive_outputs[-1]
 
                 output = tf.where(tiled_mask_t, output, prev_output)
@@ -191,9 +215,11 @@ def rnn(
                 states = tree.pack_sequence_as(states, flat_final_states)
 
                 if return_all_outputs:
+                    record_branch("test_19")
                     successive_outputs.append(output)
                     successive_states.append(states)
                 else:
+                    record_branch("test_20")
                     successive_outputs = [output]
                     successive_states = [states]
             last_output = successive_outputs[-1]
@@ -201,6 +227,7 @@ def rnn(
             outputs = tf.stack(successive_outputs)
 
             if zero_output_for_mask:
+                record_branch("test_21")
                 last_output = tf.where(
                     _expand_mask(mask_list[-1], last_output),
                     last_output,
@@ -213,15 +240,18 @@ def rnn(
                 )
 
         else:  # mask is None
+            record_branch("test_22")
             for i in range(time_steps):
                 inp = _get_input_tensor(i)
                 output, states = step_function(
                     inp, tuple(states) + tuple(constants)
                 )
                 if return_all_outputs:
+                    record_branch("test_23")
                     successive_outputs.append(output)
                     successive_states.append(states)
                 else:
+                    record_branch("test_24")
                     successive_outputs = [output]
                     successive_states = [states]
             last_output = successive_outputs[-1]
@@ -229,6 +259,7 @@ def rnn(
             outputs = tf.stack(successive_outputs)
 
     else:  # Unroll == False
+        record_branch("test_25")
         states = tuple(initial_states)
 
         # Create input tensor array, if the inputs is nested tensors, then it
@@ -277,8 +308,10 @@ def rnn(
         time = tf.constant(0, dtype="int32", name="time")
 
         if input_length is None:
+            record_branch("test_26")
             max_iterations = time_steps_t
         else:
+            record_branch("test_27")
             max_iterations = tf.reduce_max(input_length)
 
         while_loop_kwargs = {
@@ -288,7 +321,9 @@ def rnn(
             "swap_memory": True,
         }
         if mask is not None:
+            record_branch("test_28")
             if go_backwards:
+                record_branch("test_29")
                 mask = tf.reverse(mask, [0])
 
             mask_ta = tf.TensorArray(
@@ -310,7 +345,9 @@ def rnn(
                 )
 
         elif isinstance(input_length, tf.Tensor):
+            record_branch("test_30")
             if go_backwards:
+                record_branch("test_31")
                 max_len = tf.reduce_max(input_length, axis=0)
                 rev_input_length = tf.subtract(max_len - 1, input_length)
 
@@ -318,7 +355,7 @@ def rnn(
                     return tf.less(rev_input_length, time)
 
             else:
-
+                record_branch("test_32")
                 def masking_fn(time):
                     return tf.greater(input_length, time)
 
@@ -329,9 +366,11 @@ def rnn(
                 )
 
         else:
+            record_branch("test_33")
             masking_fn = None
 
         if masking_fn is not None:
+            record_branch("test_34")
             # Mask for the T output will be base on the output of T - 1. In the
             # case T = 0, a zero filled tensor will be used.
             flat_zero_output = tuple(
@@ -394,7 +433,7 @@ def rnn(
             # Skip final_outputs[2] which is the output for final timestep.
             new_states = final_outputs[3:]
         else:
-
+            record_branch("test_35")
             def _step(time, output_ta_t, *states):
                 """RNN step function.
 
@@ -441,6 +480,7 @@ def rnn(
         last_output = tree.pack_sequence_as(output_time_zero, last_output)
 
     if not time_major:
+        record_branch("test_36")
         outputs = tree.map_structure(swap_batch_timestep, outputs)
 
     return last_output, outputs, new_states
