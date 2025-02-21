@@ -367,6 +367,45 @@ class SerializationLibTest(testing.TestCase):
         obj = serialization_lib.deserialize_keras_object(config)
         self.assertIs(obj, custom_registered_fn)
 
+    def test_deserialize_invalid_config(self):
+        # Test deserializing an invalid config (not a dict or primitive type)
+        with self.assertRaises(TypeError):
+            serialization_lib.deserialize_keras_object([1, 2, 3])
+
+    def test_deserialize_missing_class_name(self):
+        # Test deserializing a dict without required class_name field
+        config = {
+            "module": "some_module",
+            "config": {"value": 42}
+        }
+        result = serialization_lib.deserialize_keras_object(config)
+        self.assertEqual(result, {"module": "some_module", "config": {"value": 42}})
+
+    def test_deserialize_none_module(self):
+        # Test deserializing a class with None module
+        config = {
+            "class_name": "CustomClass",
+            "config": {"value": 42},
+            "module": None
+        }
+        with self.assertRaises(TypeError):
+            serialization_lib.deserialize_keras_object(config)
+
+    def test_deserialize_custom_object_priority(self):
+        # Test that custom objects take priority over module lookup
+        def custom_fn(x):
+            return x + 1
+
+        config = {
+            "class_name": "function",
+            "config": "custom_fn",
+            "module": "builtins"
+        }
+        result = serialization_lib.deserialize_keras_object(
+            config, custom_objects={"custom_fn": custom_fn}
+        )
+        self.assertEqual(result(5), 6)
+
 
 @keras.saving.register_keras_serializable()
 class MyDense(keras.layers.Layer):
