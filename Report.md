@@ -252,6 +252,28 @@ Estimated impact of refactoring (lower CC, but other drawbacks?).
 
 
 
+### Refactoring plan for `rnn` (Ismail Mohammed):
+
+To improve the `rnn()` function, the strategy is to break down its complex logic into smaller, focused helper functions. The `rnn` function currently handles many responsibilities, including input shape handling, time-major transposition, unrolling logic, symbolic execution with `tf.while_loop`, masking logic, and output post-processing. Keeping all this logic in one place makes the function difficult to read, maintain, and test.
+
+To reduce complexity and improve structure, the following changes can be made:
+
+- **Input preparation** logic (especially the part that deals with `time_major`) can be moved to a helper function like `_prepare_inputs()` to make the input handling consistent and reusable.
+- The **unrolling logic** (`if unroll:` block) can be moved to `_run_unrolled_rnn()`, which will focus only on the step-by-step iteration over time steps without symbolic loops.
+- The **symbolic execution logic** (`else:` block using `tf.while_loop`) can be placed in a helper function `_run_symbolic_rnn()` to isolate the dynamic graph logic.
+- All **mask-related logic**, such as reshaping and applying masks with `tf.where`, can be encapsulated in separate helpers like `_handle_masking()` and `_apply_output_mask()` for better modularity and testability.
+
+By modularizing the `rnn()` function in this way, each helper function will be focused on a single task. This will make the code easier to follow, more maintainable, and easier to test.
+
+**Estimated impact of refactoring:**
+- **Reduced Cyclomatic Complexity**: Breaking down the logic will simplify the main function and make control flow clearer.
+- **Improved Code Quality**: Each part of the function will be easier to maintain and modify independently.
+- **Enhanced Testability**: Smaller functions can be individually tested with well-defined input/output behavior.
+
+
+
+
+
 
 ## Coverage
 
