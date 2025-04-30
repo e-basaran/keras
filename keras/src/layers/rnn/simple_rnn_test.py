@@ -281,3 +281,111 @@ class SimpleRNNTest(testing.TestCase):
             ),
             output,
         )
+
+
+import numpy as np
+import tensorflow as tf
+from keras.src.backend.tensorflow.rnn import rnn
+
+
+def test_rnn_time_major():
+    batch_size, timesteps, input_dim, units = 2, 3, 4, 5
+
+    inputs = tf.random.normal((timesteps, batch_size, input_dim)) 
+    initial_state = tf.zeros((batch_size, units))
+
+    W = tf.ones((input_dim, units))
+    U = tf.eye(units)
+
+    def step_fn(input_t, states):
+        prev_state = states[0]
+        output = tf.matmul(input_t, W) + tf.matmul(prev_state, U)
+        return output, [output]
+
+    final_state, outputs, all_states = rnn(
+        step_fn,
+        inputs,
+        [initial_state],
+        go_backwards=False,
+        unroll=False,
+        input_length=timesteps,
+        time_major=True,
+        zero_output_for_mask=False,
+        return_all_outputs=True,
+    )
+
+    assert outputs.shape == (timesteps, batch_size, units) 
+
+
+def test_rnn_with_constants():
+    batch_size, timesteps, input_dim, units = 2, 3, 4, 5
+
+    inputs = tf.random.normal((batch_size, timesteps, input_dim))
+    initial_state = tf.zeros((batch_size, units))
+    constant_value = tf.ones((batch_size, units))
+
+    def step_fn(input_t, states):
+        prev_state = states[0]
+        constant = states[1]  # get constant
+        output = tf.matmul(input_t, tf.ones((input_dim, units))) + tf.matmul(prev_state + constant, tf.eye(units))
+        return output, [output]
+
+    final_state, outputs, all_states = rnn(
+        step_fn,
+        inputs,
+        [initial_state],
+        constants=[constant_value],
+        go_backwards=False,
+        unroll=False,
+        input_length=timesteps,
+        zero_output_for_mask=False,
+        return_all_outputs=True,
+    )
+
+    assert outputs.shape == (batch_size, timesteps, units)
+
+
+
+def test_expand_mask_high_rank_diff():
+    batch_size, timesteps, input_dim, units = 2, 3, 4, 5
+    inputs = tf.random.normal((batch_size, timesteps, input_dim, 2))
+    mask = tf.ones((batch_size, timesteps), dtype=tf.int32) 
+    mask = tf.cast(mask, tf.bool)
+
+    initial_state = [tf.zeros((batch_size, units))]
+
+    def step_fn(input_t, states):
+        return tf.reduce_mean(input_t, axis=-1), states
+
+    rnn(
+        step_fn,
+        inputs,
+        initial_state,
+        mask=mask,
+        unroll=True,
+        input_length=timesteps
+    )
+
+
+def test_rnn_return_last_output_only():
+    batch_size, timesteps, input_dim, units = 2, 3, 4, 5
+
+    inputs = tf.random.normal((batch_size, timesteps, input_dim))
+    initial_state = tf.zeros((batch_size, units))
+
+    W = tf.ones((input_dim, units))
+    U = tf.eye(units)
+
+    def step_fn(input_t, states):
+        return tf.matmul(input_t, W) + tf.matmul(states[0], U), [states[0]]
+
+    final_state, outputs, new_states = rnn(
+        step_fn,
+        inputs,
+        [initial_state],
+        return_all_outputs=False,
+        unroll=True
+    )
+
+    assert outputs.shape == (batch_size, 1, units)
+
