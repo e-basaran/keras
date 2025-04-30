@@ -309,6 +309,10 @@ For set_vocabulary:
 
 5 new test cases were added. Improved the coverage from 32% to 51%.
 
+### For rnn:
+
+4 new test cases were added. Improved the coverage from 47% to 50%.
+
 git diff coverage-improvement master
 
 ## Self-assessment: Way of working
